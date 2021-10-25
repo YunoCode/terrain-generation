@@ -1,4 +1,4 @@
-local TerrainGeneration = require(game:GetService("ReplicatedStorage").Yuno).setup:GetEnv()
+local TerrainGeneration = {}--require(game:GetService("ReplicatedStorage").Yuno).setup:GetEnv()
 TerrainGeneration.__index = TerrainGeneration
 
 local Simplex = require(script.Simplex)
@@ -11,12 +11,12 @@ PGTFolder.Name = 'PGT'
 local noise = math.noise
 
 --> @TODO: populate rhe generation
---> @TODO: useful method ( :GetTrees(), ..., :Clear(), )
+--> @TODO: useful method ( :GetTrees(), ..., :Clear(), )s
 
 local function Create(Position: Vector3, Size: Vector3): (BasePart)
 	local Part = Instance.new("Part")
 	Part.Anchored = true
-	Part.Size = Size or Vector3.new(7.5, 7.5, 7.5)
+	Part.Size = Size or Vector3.new(1, 1, 1)
 	Part.Position = Position
 	Part.Parent = PGTFolder
 
@@ -24,21 +24,24 @@ local function Create(Position: Vector3, Size: Vector3): (BasePart)
 end
 
 function TerrainGeneration.new(Properties): ({any: any})
+	Properties.Table = {}
 	return setmetatable(Properties, TerrainGeneration)
 end
 
 function TerrainGeneration:Generate()
-	for y = 1, self.Size.Y do
-		for x = 1, self.Size.X do
-			local Alpha = self:FBM(x, y) * 10
-			Create(Vector3.new(x*7.5, Alpha, y*7.5))
+	for x = 1, self.Size.X do
+		self.Table[x] = {}
+		for y = 1, self.Size.Y do
+			local Alpha = self:_FBM(x, y) * 10
+			if self.LowestPoint == nil or Alpha < self.LowestPoint then self.LowestPoint = Alpha end
+			self.Table[x][y] = Vector3.new(x*self.Spacing, Alpha, y*self.Spacing)
 		end
 	end
 
 	return self
 end
 
-function TerrainGeneration:FBM(x, y): Vector3
+function TerrainGeneration:_FBM(x, y): Vector3
 	local xs = x / self.TerrainDescription.Scale;
 	local ys = y / self.TerrainDescription.Scale
 	local G = 2.0 ^ (-self.TerrainDescription.Persistence)
@@ -46,7 +49,7 @@ function TerrainGeneration:FBM(x, y): Vector3
 	local frequency = 1.0;
 	local normalization = 0;
 	local total = 0;
-	local noise = self.TerrainDescription.NoiseFunc
+	local noise = self.NoiseFunc
 
 	for o = 1, self.TerrainDescription.Octaves do
 		local noiseValue = noise:Get2DValue(
@@ -61,11 +64,27 @@ function TerrainGeneration:FBM(x, y): Vector3
 	return math.pow(total, self.TerrainDescription.Exp) * self.TerrainDescription.Height;
 end
 
+function TerrainGeneration:GetPoints()
+	return self.Table
+end
+
+function TerrainGeneration:GetLowestPoint()
+	return self.LowestPoint
+end
+
+function TerrainGeneration:Draw(Size)
+	for X, YT in pairs(self.Table) do
+		for Y, v in pairs(YT) do
+			Create(v, Size)
+		end
+	end
+end
 
 function TerrainGeneration:GetProperties()
 	return {
 		Size = Vector3.new(100, 100, 0),
 		Position = Vector3.new(),
+		Spacing = 7.5,
 		NoiseFunc = Simplex():Init(),
 		TerrainDescription = {
 			Octaves = 3,
